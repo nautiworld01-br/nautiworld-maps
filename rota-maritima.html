@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de Distância Náutica</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --panel: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #0b4da2;
+      --line2: #ffffff;
+      --accent: #0f5bd8;
+      --accent-2: #0b3e8a;
+      --success: #15803d;
+      --border: rgba(15, 23, 42, 0.08);
+      --shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+
+    .app {
+      min-height: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .map-wrap {
+      position: relative;
+      min-height: calc(100vh - 32px);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    #map { width: 100%; height: 100%; min-height: calc(100vh - 32px); }
+
+    .panel {
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-self: start;
+      position: sticky;
+      top: 16px;
+    }
+
+    .title { font-size: 28px; font-weight: 700; margin: 0 0 4px; }
+    .sub { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      background: #eef2ff;
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .segmented button,
+    .icon-btn,
+    .action-btn {
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .segmented button {
+      padding: 10px 12px;
+      background: transparent;
+      color: #0f3d7c;
+    }
+
+    .segmented button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      background: #fff;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .icon-btn.danger {
+      background: #ef4444;
+      color: #fff;
+      border: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #0f172a;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 15px;
+      outline: none;
+      background: #fff;
+    }
+
+    .summary {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 700;
+      background: rgba(7, 34, 76, 0.96);
+      color: #fff;
+      padding: 16px 18px;
+      border-radius: 14px;
+      min-width: 220px;
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.18);
+    }
+
+    .summary .kicker {
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      opacity: 0.85;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .summary .distance {
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .summary .distance strong {
+      font-size: 40px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .summary small { display: block; opacity: 0.8; margin-top: 6px; }
+
+    .help {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .actions { display: flex; gap: 8px; }
+
+    .action-btn {
+      padding: 11px 14px;
+      background: #f59e0b;
+      color: #fff;
+      width: 100%;
+    }
+
+    .leaflet-control-attribution { font-size: 10px; }
+
+    .point-label {
+      background: #0f5bd8;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .point-label.b { background: #ef4444; }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+      .map-wrap, #map { min-height: 62vh; }
+      .panel { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="summary" id="summary">
+        <div class="kicker">Distância total</div>
+        <div class="distance"><strong>0.00</strong> <span id="unitText">Milhas Náuticas</span></div>
+        <small id="summaryHint">Toque no mapa para definir A e B.</small>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div>
+        <h1 class="title">Calculadora de Distância Náutica</h1>
+        <p class="sub">Toque no mapa para definir os pontos A e B. Esta versão calcula distância marítima em linha reta.</p>
+      </div>
+
+      <div class="segmented">
+        <button id="unitNm" class="active" type="button">Milhas Náuticas</button>
+        <button id="unitKm" type="button">quilômetros</button>
+        <button id="clearBtn" class="icon-btn danger" type="button" title="Limpar">🗑</button>
+        <button id="fitBtn" class="icon-btn" type="button" title="Enquadrar">⤢</button>
+      </div>
+
+      <div>
+        <label for="speedInput">Velocidade média de cruzeiro</label>
+        <input id="speedInput" type="number" min="0" step="0.1" value="10" />
+      </div>
+
+      <div>
+        <label for="timeOutput">Duração da viagem</label>
+        <input id="timeOutput" type="text" value="0.0 h" readonly />
+      </div>
+
+      <div>
+        <label for="priceInput">Preço</label>
+        <input id="priceInput" type="number" min="0" step="0.01" value="0" />
+      </div>
+
+      <div>
+        <label for="consumptionInput">Consumo</label>
+        <input id="consumptionInput" type="number" min="0" step="0.1" value="0" />
+      </div>
+
+      <div>
+        <label for="costOutput">Custo</label>
+        <input id="costOutput" type="text" value="0.0" readonly />
+      </div>
+
+      <div class="actions">
+        <button id="shareBtn" class="action-btn" type="button">Compartilhar</button>
+      </div>
+
+      <div class="help">
+        Use esta página no Glide via Web Embed apontando para a URL do GitHub Pages. Você também pode passar coordenadas pela URL usando <strong>?aLat=...&aLng=...&bLat=...&bLng=...</strong>.
+      </div>
+    </aside>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const qs = new URLSearchParams(window.location.search);
+
+    const map = L.map('map', { zoomControl: true }).setView([-23.006, -44.318], 12);
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const seamarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: 'OpenSeaMap'
+    }).addTo(map);
+
+    let pointA = null;
+    let pointB = null;
+    let markerA = null;
+    let markerB = null;
+    let line = null;
+    let unit = 'nm';
+
+    const summary = document.getElementById('summary');
+    const unitText = document.getElementById('unitText');
+    const summaryHint = document.getElementById('summaryHint');
+    const speedInput = document.getElementById('speedInput');
+    const timeOutput = document.getElementById('timeOutput');
+    const priceInput = document.getElementById('priceInput');
+    const consumptionInput = document.getElementById('consumptionInput');
+    const costOutput = document.getElementById('costOutput');
+    const btnNm = document.getElementById('unitNm');
+    const btnKm = document.getElementById('unitKm');
+
+    function pointIcon(letter, className = '') {
+      return L.divIcon({
+        className: '',
+        html: `<div class="point-label ${className}">${letter}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+    }
+
+    function toRad(v) { return v * Math.PI / 180; }
+
+    function haversineMeters(a, b) {
+      const R = 6371008.8;
+      const dLat = toRad(b.lat - a.lat);
+      const dLng = toRad(b.lng - a.lng);
+      const lat1 = toRad(a.lat);
+      const lat2 = toRad(b.lat);
+      const s1 = Math.sin(dLat / 2);
+      const s2 = Math.sin(dLng / 2);
+      const h = s1 * s1 + Math.cos(lat1) * Math.cos(lat2) * s2 * s2;
+      return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    }
+
+    function metersToNm(m) { return m / 1852; }
+    function metersToKm(m) { return m / 1000; }
+
+    function formatNumber(v) {
+      return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function readNumber(input) {
+      const n = Number(input.value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function updateOutputs() {
+      if (!pointA || !pointB) {
+        summary.querySelector('strong').textContent = '0.00';
+        unitText.textContent = unit === 'nm' ? 'Milhas Náuticas' : 'quilômetros';
+        summaryHint.textContent = 'Toque no mapa para definir A e B.';
+        timeOutput.value = '0.0 h';
+        costOutput.value = '0.0';
+        postToHost({ type: 'route_result', ready: false });
+        return;
+      }
+
+      const meters = haversineMeters(pointA, pointB);
+      const distance = unit === 'nm' ? metersToNm(meters) : metersToKm(meters);
+      const speed = readNumber(speedInput);
+      const price = readNumber(priceInput);
+      const consumption = readNumber(consumptionInput);
+      const distanceNm = metersToNm(meters);
+      const durationHours = speed > 0 ? (distanceNm / speed) : 0;
+      const fuelCost = durationHours * consumption * price;
+
+      summary.querySelector('strong').textContent = formatNumber(distance);
+      unitText.textContent = unit === 'nm' ? 'Milhas Náuticas' : 'quilômetros';
+      summaryHint.textContent = `A: ${pointA.lat.toFixed(5)}, ${pointA.lng.toFixed(5)} | B: ${pointB.lat.toFixed(5)}, ${pointB.lng.toFixed(5)}`;
+      timeOutput.value = `${formatNumber(durationHours)} h`;
+      costOutput.value = formatNumber(fuelCost);
+
+      postToHost({
+        type: 'route_result',
+        ready: true,
+        distance_meters: meters,
+        distance_nm: distanceNm,
+        distance_km: metersToKm(meters),
+        duration_hours: durationHours,
+        cost: fuelCost,
+        point_a: pointA,
+        point_b: pointB
+      });
+    }
+
+    function draw() {
+      if (line) {
+        map.removeLayer(line);
+        line = null;
+      }
+
+      if (markerA) map.removeLayer(markerA);
+      if (markerB) map.removeLayer(markerB);
+
+      if (pointA) markerA = L.marker(pointA, { icon: pointIcon('A') }).addTo(map);
+      if (pointB) markerB = L.marker(pointB, { icon: pointIcon('B', 'b') }).addTo(map);
+
+      if (pointA && pointB) {
+        line = L.polyline([pointA, pointB], {
+          color: '#0b4da2',
+          weight: 3,
+          dashArray: '10 8',
+          opacity: 1
+        }).addTo(map);
+      }
+
+      updateOutputs();
+    }
+
+    function fitRoute() {
+      if (pointA && pointB) {
+        map.fitBounds(L.latLngBounds([pointA, pointB]), { padding: [40, 40] });
+      } else if (pointA) {
+        map.setView(pointA, 13);
+      } else if (pointB) {
+        map.setView(pointB, 13);
+      }
+    }
+
+    function setPointsFromQuery() {
+      const aLat = parseFloat(qs.get('aLat'));
+      const aLng = parseFloat(qs.get('aLng'));
+      const bLat = parseFloat(qs.get('bLat'));
+      const bLng = parseFloat(qs.get('bLng'));
+
+      if ([aLat, aLng].every(Number.isFinite)) pointA = { lat: aLat, lng: aLng };
+      if ([bLat, bLng].every(Number.isFinite)) pointB = { lat: bLat, lng: bLng };
+
+      draw();
+      fitRoute();
+    }
+
+    function postToHost(payload) {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+      }
+    }
+
+    map.on('click', function (e) {
+      const point = { lat: e.latlng.lat, lng: e.latlng.lng };
+
+      if (!pointA) {
+        pointA = point;
+      } else if (!pointB) {
+        pointB = point;
+      } else {
+        pointA = pointB;
+        pointB = point;
+      }
+
+      draw();
+    });
+
+    btnNm.addEventListener('click', function () {
+      unit = 'nm';
+      btnNm.classList.add('active');
+      btnKm.classList.remove('active');
+      updateOutputs();
+    });
+
+    btnKm.addEventListener('click', function () {
+      unit = 'km';
+      btnKm.classList.add('active');
+      btnNm.classList.remove('active');
+      updateOutputs();
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', function () {
+      pointA = null;
+      pointB = null;
+      draw();
+    });
+
+    document.getElementById('fitBtn').addEventListener('click', fitRoute);
+    document.getElementById('shareBtn').addEventListener('click', function () {
+      const url = new URL(window.location.href);
+      if (pointA) { url.searchParams.set('aLat', pointA.lat); url.searchParams.set('aLng', pointA.lng); }
+      if (pointB) { url.searchParams.set('bLat', pointB.lat); url.searchParams.set('bLng', pointB.lng); }
+      navigator.clipboard?.writeText(url.toString()).catch(() => {});
+      alert('Link copiado com os pontos atuais.');
+    });
+
+    [speedInput, priceInput, consumptionInput].forEach(el => {
+      el.addEventListener('input', updateOutputs);
+    });
+
+    setPointsFromQuery();
+    updateOutputs();
+  </script>
+</body>
+</html>
