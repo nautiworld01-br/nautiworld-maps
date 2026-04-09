@@ -1,14 +1,10 @@
-from pathlib import Path
-
-html = r'''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>Rota Marítima Manual</title>
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
     html, body {
       margin: 0;
@@ -19,88 +15,69 @@ html = r'''<!DOCTYPE html>
       background: #ffffff;
     }
 
-    #app {
-      position: relative;
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
-      background: #fff;
-    }
-
     #map {
       width: 100%;
-      height: 100%;
+      height: 100vh;
+      background: #fff;
     }
 
     .panel {
       position: absolute;
+      left: 12px;
       right: 12px;
-      top: 12px;
+      bottom: 12px;
       z-index: 1000;
-      width: 240px;
       background: rgba(255,255,255,0.96);
       border-radius: 14px;
-      padding: 14px;
+      padding: 12px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.14);
     }
 
-    .panel h2 {
+    .title {
       margin: 0 0 8px 0;
-      font-size: 18px;
-      line-height: 1.15;
+      font-size: 17px;
+      font-weight: 700;
       color: #0b2341;
-    }
-
-    .panel p {
-      margin: 0 0 12px 0;
-      font-size: 12px;
-      line-height: 1.4;
-      color: #5d6b7a;
     }
 
     .metric {
       background: #0b2f66;
       color: #fff;
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 10px 12px;
       margin-bottom: 10px;
     }
 
     .metric-label {
-      font-size: 11px;
-      opacity: 0.85;
-      margin-bottom: 4px;
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      opacity: 0.85;
+      margin-bottom: 4px;
     }
 
     .metric-value {
-      font-size: 28px;
+      font-size: 20px;
       font-weight: 700;
       line-height: 1;
     }
 
-    .metric-unit {
-      font-size: 13px;
-      font-weight: 600;
-      margin-left: 4px;
-      opacity: 0.95;
-    }
-
-    .subinfo {
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
       font-size: 12px;
       color: #334155;
-      margin-bottom: 12px;
-      line-height: 1.45;
+      margin-bottom: 10px;
     }
 
     .buttons {
       display: flex;
       gap: 8px;
-      flex-wrap: wrap;
     }
 
     button {
+      flex: 1;
       border: 0;
       border-radius: 10px;
       padding: 10px 12px;
@@ -109,50 +86,14 @@ html = r'''<!DOCTYPE html>
       cursor: pointer;
     }
 
-    .btn-primary {
-      background: #0b5bd3;
-      color: #fff;
-    }
-
-    .btn-danger {
-      background: #ef4444;
-      color: #fff;
-    }
-
     .btn-secondary {
       background: #e8eef7;
       color: #17365f;
     }
 
-    .hint {
-      position: absolute;
-      left: 12px;
-      bottom: 12px;
-      z-index: 1000;
-      background: rgba(255,255,255,0.96);
-      color: #334155;
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 12px;
-      line-height: 1.35;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-      max-width: calc(100vw - 290px);
-    }
-
-    @media (max-width: 760px) {
-      .panel {
-        left: 12px;
-        right: 12px;
-        top: auto;
-        bottom: 74px;
-        width: auto;
-      }
-      .hint {
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        max-width: none;
-      }
+    .btn-danger {
+      background: #ef4444;
+      color: #fff;
     }
 
     .leaflet-control-attribution {
@@ -161,33 +102,24 @@ html = r'''<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <div id="app">
-    <div id="map"></div>
+  <div id="map"></div>
 
-    <div class="panel">
-      <h2>Rota Marítima Manual</h2>
-      <p>Toque no mapa para criar os waypoints da rota.</p>
+  <div class="panel">
+    <div class="title">Rota Marítima Manual</div>
 
-      <div class="metric">
-        <div class="metric-label">Distância total</div>
-        <div>
-          <span class="metric-value" id="distanceValue">0.00</span><span class="metric-unit">MN</span>
-        </div>
-      </div>
-
-      <div class="subinfo">
-        Pontos: <strong id="pointCount">0</strong><br>
-        Último trecho: <strong id="lastLeg">0.00 MN</strong>
-      </div>
-
-      <div class="buttons">
-        <button class="btn-secondary" id="undoBtn">Desfazer último</button>
-        <button class="btn-danger" id="clearBtn">Limpar rota</button>
-      </div>
+    <div class="metric">
+      <div class="metric-label">Distância total</div>
+      <div class="metric-value"><span id="distanceValue">0.00</span> MN</div>
     </div>
 
-    <div class="hint">
-      Toque para adicionar pontos. A rota será desenhada na sequência dos waypoints.
+    <div class="meta">
+      <div>Pontos: <strong id="pointCount">0</strong></div>
+      <div>Último: <strong id="lastLeg">0.00 MN</strong></div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-secondary" id="undoBtn">Desfazer</button>
+      <button class="btn-danger" id="clearBtn">Limpar</button>
     </div>
   </div>
 
@@ -195,18 +127,15 @@ html = r'''<!DOCTYPE html>
   <script>
     const map = L.map('map', { zoomControl: true }).setView([-23.01, -44.32], 10);
 
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
-    });
+    }).addTo(map);
 
-    const openSeaMap = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: 'OpenSeaMap'
-    });
-
-    osm.addTo(map);
-    openSeaMap.addTo(map);
+    }).addTo(map);
 
     let points = [];
     let markers = [];
@@ -258,13 +187,13 @@ html = r'''<!DOCTYPE html>
     }
 
     function createMarker(latlng, index) {
-      return L.marker(latlng, {
-        draggable: true
-      }).addTo(map).bindTooltip(String(index + 1), {
-        permanent: true,
-        direction: 'top',
-        offset: [0, -8]
-      });
+      return L.marker(latlng, { draggable: true })
+        .addTo(map)
+        .bindTooltip(String(index + 1), {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -8]
+        });
     }
 
     function rebuildMarkers() {
@@ -278,52 +207,27 @@ html = r'''<!DOCTYPE html>
           redraw();
         });
 
-        marker.on('dragend', () => {
-          syncToHost();
-        });
-
         return marker;
       });
     }
 
     function redraw() {
       polyline.setLatLngs(points);
-      const total = totalDistanceNm(points);
-      const lastLeg = getLastLegNm(points);
-
-      distanceValueEl.textContent = total.toFixed(2);
+      distanceValueEl.textContent = totalDistanceNm(points).toFixed(2);
       pointCountEl.textContent = String(points.length);
-      lastLegEl.textContent = lastLeg.toFixed(2) + ' MN';
-    }
-
-    function syncToHost() {
-      const payload = {
-        type: 'manual_route',
-        total_nm: Number(totalDistanceNm(points).toFixed(2)),
-        point_count: points.length,
-        points: points.map(p => ({
-          lat: Number(p.lat.toFixed(6)),
-          lng: Number(p.lng.toFixed(6))
-        }))
-      };
-
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-      }
+      lastLegEl.textContent = getLastLegNm(points).toFixed(2) + ' MN';
     }
 
     function addPoint(latlng) {
       points.push({ lat: latlng.lat, lng: latlng.lng });
       rebuildMarkers();
       redraw();
-      syncToHost();
     }
 
     function clearRoute() {
       points = [];
       rebuildMarkers();
       redraw();
-      syncToHost();
     }
 
     function undoLast() {
@@ -331,7 +235,6 @@ html = r'''<!DOCTYPE html>
       points.pop();
       rebuildMarkers();
       redraw();
-      syncToHost();
     }
 
     map.on('click', function(e) {
@@ -345,8 +248,3 @@ html = r'''<!DOCTYPE html>
   </script>
 </body>
 </html>
-'''
-
-path = Path('/mnt/data/rota-maritima-manual.html')
-path.write_text(html, encoding='utf-8')
-print(f"Saved to {path}")
